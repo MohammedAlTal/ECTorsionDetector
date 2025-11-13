@@ -1,1 +1,1 @@
-### Placeholde - Project Folder will be pushed from IDE
+### Placeholder - Project Folder will be pushed from IDE
