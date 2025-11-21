@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torsion Point Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Detecting Torsion Points on Elliptic Curves</h1>
+            <p class="subtitle">MATH 312 Project - Mohammed Al-Tal</p>
+        </header>
+
+        <!-- Example Selector -->
+        <section class="section">
+            <h2>Load Example Curve</h2>
+            <div class="input-wrapper">
+                <label>Select a pre-loaded example</label>
+                <select id="exampleSelect" onchange="loadExample()">
+                    <option value="">-- Choose an example --</option>
+                </select>
+            </div>
+        </section>
+
+        <!-- Curve Input -->
+        <section class="section">
+            <h2>Define Elliptic Curve: y² = x³ + ax + b</h2>
+            <div class="input-grid">
+                <div class="input-wrapper">
+                    <label>Coefficient a</label>
+                    <input type="text" id="a" value="0" placeholder="Enter a">
+                </div>
+                <div class="input-wrapper">
+                    <label>Coefficient b</label>
+                    <input type="text" id="b" value="0" placeholder="Enter b">
+                </div>
+            </div>
+        </section>
+
+        <!-- Point Input -->
+        <section class="section">
+            <h2>Test Point Coordinates</h2>
+            <div class="input-grid">
+                <div class="input-wrapper">
+                    <label>x-coordinate</label>
+                    <input type="text" id="x" value="0" placeholder="Enter x">
+                </div>
+                <div class="input-wrapper">
+                    <label>y-coordinate</label>
+                    <input type="text" id="y" value="0" placeholder="Enter y">
+                </div>
+            </div>
+        </section>
+
+        <!-- Actions -->
+        <section class="section">
+            <div class="button-row">
+                <button class="btn btn-primary" onclick="checkTorsion()">
+                    Check if Point is Torsion
+                </button>
+                <button class="btn btn-secondary" onclick="findSubgroup()">
+                    Find All Torsion Points
+                </button>
+            </div>
+        </section>
+
+        <!-- Results -->
+        <div id="resultsArea" style="display:none;">
+            <section class="section">
+                <h2>Results</h2>
+                <div id="resultContent" class="result-box"></div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // Load examples on page load
+        let examples = [];
+
+        async function loadExamples() {
+            try {
+                const response = await fetch('/api/examples');
+                const data = await response.json();
+                examples = data.examples;
+                
+                const select = document.getElementById('exampleSelect');
+                examples.forEach((ex, idx) => {
+                    const option = document.createElement('option');
+                    option.value = idx;
+                    option.textContent = ex.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading examples:', error);
+            }
+        }
+
+        function loadExample() {
+            const select = document.getElementById('exampleSelect');
+            const idx = select.value;
+            
+            if (idx === '') return;
+            
+            const example = examples[idx];
+            document.getElementById('a').value = example.a;
+            document.getElementById('b').value = example.b;
+            document.getElementById('x').value = example.test_point.x;
+            document.getElementById('y').value = example.test_point.y;
+            
+            document.getElementById('resultsArea').style.display = 'none';
+        }
+
+        async function checkTorsion() {
+            const data = {
+                a: document.getElementById('a').value,
+                b: document.getElementById('b').value,
+                x: document.getElementById('x').value,
+                y: document.getElementById('y').value
+            };
+
+            try {
+                const response = await fetch('/api/check_torsion', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                displayTorsionResult(result);
+            } catch (error) {
+                displayError('Error checking torsion: ' + error.message);
+            }
+        }
+
+        function displayTorsionResult(result) {
+            const resultsArea = document.getElementById('resultsArea');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultsArea.style.display = 'block';
+
+            if (!result.success) {
+                resultContent.innerHTML = `<p class="error">${result.error}</p>`;
+                return;
+            }
+
+            let html = `
+                <p><strong>Curve:</strong> ${result.curve}</p>
+                <p><strong>Point:</strong> ${result.point}</p>
+                <p class="highlight"><strong>Is Torsion:</strong> ${result.is_torsion ? 'YES' : 'NO'}</p>
+            `;
+
+            if (result.is_torsion) {
+                html += `<p class="highlight"><strong>Order:</strong> ${result.order}</p>`;
+                html += `<h4>Point Multiples:</h4><ul>`;
+                result.multiples.forEach(m => {
+                    html += `<li>${m.n}P = ${m.point}</li>`;
+                });
+                html += `<li>${result.order}P = O (Identity)</li></ul>`;
+            }
+
+            resultContent.innerHTML = html;
+            resultContent.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function findSubgroup() {
+            const data = {
+                a: document.getElementById('a').value,
+                b: document.getElementById('b').value,
+                search_range: 20
+            };
+
+            try {
+                const response = await fetch('/api/find_torsion_subgroup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                displaySubgroupResult(result);
+            } catch (error) {
+                displayError('Error finding subgroup: ' + error.message);
+            }
+        }
+
+        function displaySubgroupResult(result) {
+            const resultsArea = document.getElementById('resultsArea');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultsArea.style.display = 'block';
+
+            if (!result.success) {
+                resultContent.innerHTML = `<p class="error">${result.error}</p>`;
+                return;
+            }
+
+            let html = `
+                <p><strong>Curve:</strong> ${result.curve}</p>
+                <p class="highlight"><strong>Group Size:</strong> ${result.size}</p>
+                <p class="highlight"><strong>Group Structure:</strong> ${result.group_structure}</p>
+                <h4>Torsion Points:</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Point</th>
+                            <th>Order</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            result.torsion_points.forEach(tp => {
+                html += `<tr><td>${tp.point}</td><td>${tp.order}</td></tr>`;
+            });
+
+            html += `</tbody></table>`;
+            resultContent.innerHTML = html;
+            resultContent.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function displayError(message) {
+            const resultsArea = document.getElementById('resultsArea');
+            const resultContent = document.getElementById('resultContent');
+            
+            resultsArea.style.display = 'block';
+            resultContent.innerHTML = `<p class="error">${message}</p>`;
+        }
+
+        window.addEventListener('load', loadExamples);
+    </script>
+</body>
+</html>
