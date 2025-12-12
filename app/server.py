@@ -28,14 +28,6 @@ def index():
 def check_torsion():
     """
     Endpoint to check if a point is torsion.
-    
-    Expected JSON:
-        {
-            "a": coefficient a,
-            "b": coefficient b,
-            "x": x-coordinate of point,
-            "y": y-coordinate of point
-        }
     """
     try:
         data = request.get_json()
@@ -43,7 +35,13 @@ def check_torsion():
         a = Fraction(data['a']).limit_denominator()
         b = Fraction(data['b']).limit_denominator()
         curve = EllipticCurve(a, b)
-        
+
+        if not curve.is_integral_model():
+            return jsonify({
+                'success': False,
+                'error': 'Nagell–Lutz requires integer coefficients a and b'
+            })
+
         x = Fraction(data['x']).limit_denominator()
         y = Fraction(data['y']).limit_denominator()
         point = Point(x, y)
@@ -89,13 +87,6 @@ def check_torsion():
 def find_torsion_subgroup():
     """
     Endpoint to find all torsion points on a curve.
-    
-    Expected JSON:
-        {
-            "a": coefficient a,
-            "b": coefficient b,
-            "search_range": integer range for point search (optional)
-        }
     """
     try:
         data = request.get_json()
@@ -105,6 +96,13 @@ def find_torsion_subgroup():
         search_range = int(data.get('search_range', 20))
         
         curve = EllipticCurve(a, b)
+
+        if not curve.is_integral_model():
+            return jsonify({
+                'success': False,
+                'error': 'Nagell–Lutz requires integer coefficients a and b'
+            })
+
         finder = TorsionFinder(curve)
         result = finder.find_torsion_subgroup(search_range)
         
